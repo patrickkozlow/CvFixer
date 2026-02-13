@@ -170,7 +170,6 @@ REMOVE or REPLACE:
 VERIFY:
 - All skills exist in the master resume
 - All certifications exist in the master resume
-- No fabricated metrics or achievements
 
 Resume to polish:
 {resume}

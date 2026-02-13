@@ -81,6 +81,7 @@ apps/backend/data/config.json
 /build
 
 # misc
+docs/
 .DS_Store
 *.pem
 
