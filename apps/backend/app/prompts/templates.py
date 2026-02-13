@@ -133,14 +133,12 @@ Job description:
 {job_description}"""
 
 CRITICAL_TRUTHFULNESS_RULES_TEMPLATE = """CRITICAL TRUTHFULNESS RULES - NEVER VIOLATE:
-1. DO NOT add any skill, tool, technology, or certification that is not explicitly mentioned in the original resume
-2. DO NOT invent numeric achievements (e.g., "increased by 30%") unless they exist in original
-3. DO NOT add company names, product names, or technical terms not in the original
-4. DO NOT upgrade experience level (e.g., "Junior" -> "Senior")
-5. DO NOT add languages, frameworks, or platforms the candidate hasn't used
-6. DO NOT extend employment dates or change timelines (start/end years)
+1. DO NOT add company names not in the original source
+2. DO NOT upgrade experience level (e.g., changing "Junior" to "Senior")
+3. DO NOT extend employment dates or change timelines (Start/End dates must remain exact)
+5. Job Designations/Titles MAY be optimized for keyword alignment, but Company Name and Duration must be preserved exactly
+6. Publications/Research titles MAY be adjusted for relevance, but the underlying subject matter must remain relevant to the job description
 7. {rule_7}
-8. Preserve factual accuracy - only use information provided by the candidate
 
 Violation of these rules could cause serious problems for the candidate in job interviews.
 """
@@ -159,6 +157,9 @@ CRITICAL_TRUTHFULNESS_RULES = {
     ),
     "full": _build_truthfulness_rules(
         "You may expand existing bullet points or add new ones that elaborate on existing work, but DO NOT invent entirely new responsibilities"
+    ),
+    "Custom": _build_truthfulness_rules(
+        "You ARE PERMITTED to add relevant technical skills from the Job Description to the Skills section."
     ),
 }
 
@@ -250,6 +251,47 @@ Original Resume:
 Output in this JSON format:
 {schema}"""
 
+IMPROVE_RESUME_PROMPT_CUSTOM = """Tailor this resume for the job. Output ONLY the JSON object, no other text.
+
+{critical_truthfulness_rules}
+
+IMPORTANT: Generate ALL text content (summary, descriptions, skills) in {output_language}.
+
+Rules:
+- Rephrase content to highlight relevant experience aligned with the Job Description
+- **SKILLS STRATEGY: You MUST identify and add missing technical skills/tools from the Job Description to the 'Technical Skills' list.**
+- Do ADD skills, technologies which are not in the master resume but necessary and relevant to the job description and job role
+- Incorporate all necessary keywords meaningfully throughout
+- Use action verbs and quantifiable achievements (add performance metrics/numbers wherever relevant and necessary based on the job description)
+- Keep proper nouns (names, company names, locations) unchanged
+- Translate job titles, descriptions, and skills to {output_language}
+- Experience designation can be changed to align with Job Description, but keep Company Name and Duration UNCHANGED
+- Each experience entry bullet point must be at MAX 600 characters long
+- Each experience entry must have exactly 4 bullet points
+- Each project description must be at least 400 characters long and be deeply relevant to job description. There should only be ONE bullet point for each project, but it should be comprehensive and detailed.
+- Adjust and rename paper publications or research if necessary to align with the job
+- Add more relevant technical skills in the Technical Skills section based on the Job Description
+- In Summary section, explicitly mention "4 years experience"
+- Preserve the structure of any customSections from the original resume
+- Improve custom section content the same way as standard sections
+- Preserve original date ranges exactly - do not modify years or dates
+- Calculate and emphasize total relevant experience duration when it matches requirements
+- Do NOT use em dash ("—") anywhere in the writing/output, even if it exists, remove it
+- DO NOT add description in Education Section
+- Identify and add missing technical skills to the Skills section that are high-priority in the Job Description and are relevant and necessary for the job role.
+
+Job Description:
+{job_description}
+
+Keywords to emphasize:
+{job_keywords}
+
+Original Resume:
+{original_resume}
+
+Output in this JSON format:
+{schema}"""
+
 IMPROVE_PROMPT_OPTIONS = [
     {
         "id": "nudge",
@@ -266,12 +308,18 @@ IMPROVE_PROMPT_OPTIONS = [
         "label": "Full tailor",
         "description": "Comprehensive tailoring using the job description.",
     },
+    {
+        "id": "Custom",
+        "label": "Custom Prompt",
+        "description": "Custom prompt defined by the user.",
+    }
 ]
 
 IMPROVE_RESUME_PROMPTS = {
     "nudge": IMPROVE_RESUME_PROMPT_NUDGE,
     "keywords": IMPROVE_RESUME_PROMPT_KEYWORDS,
     "full": IMPROVE_RESUME_PROMPT_FULL,
+    "Custom": IMPROVE_RESUME_PROMPT_CUSTOM,
 }
 
 DEFAULT_IMPROVE_PROMPT_ID = "keywords"

@@ -135,14 +135,13 @@ AI_PHRASE_REPLACEMENTS: dict[str, str] = {
 
 
 # Prompt for injecting missing keywords into a resume
-KEYWORD_INJECTION_PROMPT = """Inject the following keywords into this resume where they can be naturally and TRUTHFULLY incorporated.
+KEYWORD_INJECTION_PROMPT = """Inject the following keywords into this resume where they can be naturally incorporated.
 
 CRITICAL RULES:
-1. Only add keywords where the master resume provides supporting evidence
-2. Do NOT add skills, technologies, or certifications not in the master resume
-3. Rephrase existing bullet points to include keywords - do not invent new content
-4. Maintain the exact same JSON structure
-5. Do not use em-dashes (—) or their variants (---, --)
+1. Do ADD skills, technologies, or certifications which are not in the master resume but necessary and relevant to the job description and job role
+2. Rephrase existing bullet points to include keywords - only invent new content if necessary and relevant to the job role and job description
+3. Maintain the exact same JSON structure
+4. Do not use em-dashes (—) or their variants (---, --)
 
 Keywords to inject (only if supported by master resume):
 {keywords_to_inject}
