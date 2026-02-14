@@ -357,26 +357,7 @@
         "swissSingle": {
           "name": "1カラム",
           "description": "内容密度が高い伝統的な全幅レイアウト"
-        },
-        "swissTwoColumn": {
-          "name": "2カラム",
-          "description": "経験中心のメイン列とスキル用サイドバー"
-        },
-        "modern": {
-          "name": "モダン",
-          "description": "カラフルなアクセントとテーマ色のカスタマイズ"
-        },
-        "modernTwoColumn": {
-          "name": "モダン2カラム",
-          "description": "モダンな2カラムとカラフルなアクセント"
         }
-      },
-      "accentColor": "アクセントカラー",
-      "accentColors": {
-        "blue": "青",
-        "green": "緑",
-        "orange": "オレンジ",
-        "red": "赤"
       },
       "pageSize": "ページサイズ",
       "margins": "余白（mm）",

@@ -357,26 +357,7 @@
         "swissSingle": {
           "name": "Single Column",
           "description": "Traditional full-width layout with maximum content density"
-        },
-        "swissTwoColumn": {
-          "name": "Two Column",
-          "description": "Experience-focused main column with sidebar for skills"
-        },
-        "modern": {
-          "name": "Modern",
-          "description": "Colorful accents with customizable theme colors"
-        },
-        "modernTwoColumn": {
-          "name": "Modern Two Column",
-          "description": "Two-column layout with modern colorful accents and themes"
         }
-      },
-      "accentColor": "Accent Color",
-      "accentColors": {
-        "blue": "Blue",
-        "green": "Green",
-        "orange": "Orange",
-        "red": "Red"
       },
       "pageSize": "Page Size",
       "margins": "Margins (mm)",
@@ -745,7 +726,7 @@
       "experience": "Experience",
       "education": "Education",
       "projects": "Projects",
-      "skills": "Skills & Awards",
+      "skills": "Technical Skills & Designations",
       "skillsOnly": "Skills",
       "certifications": "Training & Certifications",
       "languages": "Languages",
@@ -761,8 +742,8 @@
     "additionalLabels": {
       "technicalSkills": "Technical Skills:",
       "languages": "Languages:",
-      "certifications": "Certifications:",
-      "awards": "Awards:"
+      "certifications": "Professional Certifications:",
+      "awards": "Professional Designations:"
     }
   },
   "coverLetter": {

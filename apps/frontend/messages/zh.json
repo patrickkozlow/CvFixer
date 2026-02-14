@@ -357,26 +357,7 @@
         "swissSingle": {
           "name": "单栏",
           "description": "传统全宽布局，内容密度最高"
-        },
-        "swissTwoColumn": {
-          "name": "双栏",
-          "description": "以经历为主的主栏布局，侧栏展示技能"
-        },
-        "modern": {
-          "name": "现代",
-          "description": "彩色点缀，支持自定义主题色"
-        },
-        "modernTwoColumn": {
-          "name": "现代双栏",
-          "description": "现代双栏布局，带彩色点缀与主题色"
         }
-      },
-      "accentColor": "强调色",
-      "accentColors": {
-        "blue": "蓝色",
-        "green": "绿色",
-        "orange": "橙色",
-        "red": "红色"
       },
       "pageSize": "纸张尺寸",
       "margins": "页边距（mm）",

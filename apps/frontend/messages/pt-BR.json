@@ -355,25 +355,7 @@
         "swissSingle": {
           "name": "Coluna Única",
           "description": "Layout tradicional de largura total com máxima densidade de conteúdo"
-        },
-        "swissTwoColumn": {
-          "name": "Duas Colunas",
-          "description": "Coluna principal focada em experiência com barra lateral para habilidades"
-        },
-        "modern": {
-          "name": "Moderno",
-          "description": "Acentos coloridos com cores de tema personalizáveis"
-        },
-        "modernTwoColumn": {
-          "name": "Moderno Duas Colunas",
-          "description": "Layout de duas colunas com acentos coloridos modernos e temas"
         }
-      },
-      "accentColors": {
-        "blue": "Azul",
-        "green": "Verde",
-        "orange": "Laranja",
-        "red": "Vermelho"
       },
       "fontNames": {
         "serif": "Serifada",
@@ -382,7 +364,6 @@
       },
       "panelTitle": "Template e Formatação",
       "template": "Template",
-      "accentColor": "Cor de Destaque",
       "pageSize": "Tamanho da Página",
       "margins": "Margens (mm)",
       "margin": {

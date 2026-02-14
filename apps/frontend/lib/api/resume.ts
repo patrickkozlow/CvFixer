@@ -239,7 +239,6 @@ export function getResumePdfUrl(
     params.set('bodyFont', settings.fontSize.bodyFont);
     params.set('compactMode', String(settings.compactMode));
     params.set('showContactIcons', String(settings.showContactIcons));
-    params.set('accentColor', settings.accentColor);
   } else {
     params.set('template', 'swiss-single');
     params.set('pageSize', 'A4');

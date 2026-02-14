@@ -1,12 +1,10 @@
-# CLAUDE.md - Resume Matcher
+# CLAUDE.md
 
-> **Context file for Claude Code.** Full documentation at [docs/agent/README.md](../docs/agent/README.md).
-
----
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Resume Matcher is an AI-powered application for tailoring resumes to job descriptions.
+Resume Matcher is an AI-powered application for tailoring resumes to job descriptions. It runs locally with Ollama or connects to cloud LLM providers via LiteLLM.
 
 | Layer | Stack |
 |-------|-------|
@@ -17,9 +15,84 @@ Resume Matcher is an AI-powered application for tailoring resumes to job descrip
 
 ---
 
-## First Steps
+## Commands
 
-**Before exploring code, read the [navigator skill](/.claude/skills/navigator/SKILL.md)** for codebase orientation.
+```bash
+# Install all dependencies (frontend npm + backend uv sync)
+npm run install
+
+# Development (both servers concurrently)
+npm run dev
+
+# Individual servers
+npm run dev:backend   # FastAPI on :8000
+npm run dev:frontend  # Next.js on :3000 (uses Turbopack)
+
+# Quality checks (run before committing)
+npm run lint          # ESLint frontend
+npm run format        # Prettier frontend
+
+# Tests
+cd apps/frontend && npm run test    # Vitest (jsdom)
+cd apps/backend && uv run pytest    # pytest
+
+# Build
+npm run build
+```
+
+Backend dependencies are managed with `uv` (pyproject.toml at `apps/backend/`). Frontend dependencies use npm (`apps/frontend/package.json`). There is no root-level monorepo tool (no turborepo/nx); the root package.json just orchestrates npm scripts.
+
+---
+
+## Architecture
+
+### Data Flow: Resume Tailoring (Core Feature)
+
+The core workflow is a **preview-confirm** pattern:
+
+1. User uploads resume (PDF/DOCX) → `POST /api/v1/resumes/upload` → parsed to Markdown → structured JSON → stored in TinyDB as "master"
+2. User submits job description → `POST /api/v1/jobs/upload` → stored with extracted keywords
+3. User initiates tailoring → `POST /api/v1/resumes/improve/preview` (read-only preview) or `/confirm` (creates record)
+4. Backend pipeline: `improver.py` extracts job keywords → generates improved resume → `refiner.py` runs multi-pass refinement:
+   - Pass 1: Keyword injection (missing JD skills)
+   - Pass 2: AI phrase removal (blacklist in `prompts/refinement.py`)
+   - Pass 3: Alignment validation against master resume (no fabrication)
+5. Cover letter + outreach message generated in parallel (`asyncio.gather`)
+6. Tailored resume stored with `parent_id` linking back to master
+
+### Frontend API Client
+
+`apps/frontend/lib/api/client.ts` provides typed utilities (`apiFetch`, `apiPost`, `apiPut`, `apiDelete`). All calls go through `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`) with `/api/v1` prefix. Domain-specific functions in `resume.ts`, `enrichment.ts`, `config.ts`.
+
+### Frontend State Management
+
+No global state library. Complex workflows use `useReducer` with typed action dispatches (see `hooks/use-enrichment-wizard.ts` for the pattern: multi-step state machine with START_ANALYSIS → QUESTIONS → GENERATION → PREVIEW → APPLY).
+
+### Backend Service Layer
+
+Routers (`app/routers/`) handle HTTP concerns only. Business logic lives in services (`app/services/`): `improver.py` (tailoring), `refiner.py` (multi-pass refinement), `parser.py` (PDF/DOCX parsing), `cover_letter.py` (generation).
+
+### LLM Integration
+
+`app/llm.py` wraps LiteLLM with provider-specific configuration. Key behaviors:
+- JSON mode auto-enabled for supported models (explicit allowlist of JSON-safe models)
+- Timeouts: 30s health, 120s completion, 180s JSON
+- 2 retries with lower temperature on failure
+- API keys passed directly via `api_key` parameter (not env vars)
+- Prompt injection sanitization on all user inputs
+- Job descriptions truncated to 2000 chars with warning
+
+### Database
+
+TinyDB with three tables: `resumes` (with `is_master`/`parent_id` for master→tailored relationships, `processing_status` for async state), `jobs` (with cached `job_keywords` and `preview_hashes`), `improvements` (linking resume + job + improvement list). Lazy-initialized singleton.
+
+### Custom Sections System
+
+Resume sections are dynamically typed: `personalInfo` (always first), `text` (single block), `itemList` (title/subtitle/years/description), `stringList` (simple array). Users can rename, reorder, hide, delete, and add custom sections.
+
+### i18n
+
+Supported locales: `en`, `es`, `zh`, `ja`. UI translations in `apps/frontend/messages/`. Content language sent to backend for LLM-generated output. Use `useTranslations()` hook from `@/lib/i18n`.
 
 ---
 
@@ -27,87 +100,10 @@ Resume Matcher is an AI-powered application for tailoring resumes to job descrip
 
 1. **All frontend UI changes** MUST follow [Swiss International Style](../docs/agent/design/style-guide.md)
 2. **All Python functions** MUST have type hints
-3. **Run `npm run lint`** before committing frontend changes
-4. **Run `npm run format`** (Prettier) before committing
-5. **Log detailed errors server-side**, return generic messages to clients
-6. **Do NOT modify** `.github/workflows/` files without explicit request
-
----
-
-## Essential Commands
-
-```bash
-# Install all dependencies
-npm run install
-
-# Development (both servers)
-npm run dev
-
-# Individual servers
-npm run dev:backend   # FastAPI on :8000
-npm run dev:frontend  # Next.js on :3000
-
-# Quality checks
-npm run lint          # Lint frontend
-npm run format        # Format with Prettier
-
-# Build
-npm run build
-```
-
----
-
-## Project Structure
-
-```
-apps/
-├── backend/                 # FastAPI + Python
-│   ├── app/
-│   │   ├── main.py          # Entry point
-│   │   ├── config.py        # Environment settings
-│   │   ├── database.py      # TinyDB wrapper
-│   │   ├── llm.py           # LiteLLM wrapper
-│   │   ├── routers/         # API endpoints
-│   │   ├── services/        # Business logic
-│   │   ├── schemas/         # Pydantic models
-│   │   └── prompts/         # LLM prompt templates
-│   └── data/                # Database storage
-│
-└── frontend/                # Next.js + React
-    ├── app/                 # Pages (dashboard, builder, tailor, print)
-    ├── components/          # UI components
-    ├── lib/                 # Utilities, API client
-    ├── hooks/               # Custom React hooks
-    └── messages/            # i18n translations (en, es, zh, ja)
-```
-
----
-
-## Documentation by Task
-
-### For Backend Changes
-1. [Backend guide](../docs/agent/architecture/backend-guide.md) - Architecture, modules, services
-2. [API contracts](../docs/agent/apis/front-end-apis.md) - API specifications
-3. [LLM integration](../docs/agent/llm-integration.md) - Multi-provider AI support
-
-### For Frontend Changes
-1. [Frontend workflow](../docs/agent/architecture/frontend-workflow.md) - User flow, components
-2. [Style guide](../docs/agent/design/style-guide.md) - **REQUIRED** Swiss International Style
-3. [Coding standards](../docs/agent/coding-standards.md) - Frontend conventions
-
-### For Template/PDF Changes
-1. [PDF template guide](../docs/agent/design/pdf-template-guide.md) - PDF rendering
-2. [Template system](../docs/agent/design/template-system.md) - Resume templates
-3. [Resume templates](../docs/agent/features/resume-templates.md) - Template types & controls
-
-### For Features
-| Feature | Documentation |
-|---------|---------------|
-| Custom sections | [custom-sections.md](../docs/agent/features/custom-sections.md) |
-| Resume templates | [resume-templates.md](../docs/agent/features/resume-templates.md) |
-| i18n | [i18n.md](../docs/agent/features/i18n.md) |
-| AI enrichment | [enrichment.md](../docs/agent/features/enrichment.md) |
-| JD matching | [jd-match.md](../docs/agent/features/jd-match.md) |
+3. **Run `npm run lint` and `npm run format`** before committing frontend changes
+4. **Log detailed errors server-side**, return generic messages to clients
+5. **Do NOT modify** `.github/workflows/` files without explicit request
+6. **Do NOT modify** CI/CD configuration, Docker build behavior, or disable existing tests without explicit request
 
 ---
 
@@ -121,7 +117,7 @@ except Exception as e:
 ```
 
 ### Frontend Textarea Fix
-All textareas need Enter key handling:
+All textareas need Enter key handling to prevent form submission:
 ```tsx
 const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
   if (e.key === 'Enter') e.stopPropagation();
@@ -129,11 +125,10 @@ const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 ```
 
 ### Mutable Defaults (Python)
-Always use `copy.deepcopy()` for mutable defaults:
+Always use `copy.deepcopy()` for mutable defaults — shared state bugs are a known issue:
 ```python
 import copy
-data = copy.deepcopy(DEFAULT_DATA)  # Correct
-# data = DEFAULT_DATA  # Wrong - shared state bug
+data = copy.deepcopy(DEFAULT_DATA)
 ```
 
 ---
@@ -155,26 +150,16 @@ data = copy.deepcopy(DEFAULT_DATA)  # Correct
 
 ---
 
-## Definition of Done
+## Documentation Index
 
-Before completing a task:
-
-- [ ] Code compiles without errors
-- [ ] `npm run lint` passes
-- [ ] UI changes follow Swiss International Style
-- [ ] Python functions have type hints
-- [ ] Schema/prompt changes documented
-
----
-
-## Out of Scope
-
-Do NOT modify without explicit request:
-- `.github/workflows/` files
-- CI/CD configuration
-- Docker build behavior
-- Existing tests (removal/disabling)
-
----
-
-> **Full agent documentation**: [docs/agent/README.md](../docs/agent/README.md)
+| Area | Document |
+|------|----------|
+| Backend architecture | [backend-guide.md](../docs/agent/architecture/backend-guide.md) |
+| Frontend workflow | [frontend-workflow.md](../docs/agent/architecture/frontend-workflow.md) |
+| API contracts | [front-end-apis.md](../docs/agent/apis/front-end-apis.md) |
+| Style guide (required) | [style-guide.md](../docs/agent/design/style-guide.md) |
+| PDF templates | [pdf-template-guide.md](../docs/agent/design/pdf-template-guide.md) |
+| Custom sections | [custom-sections.md](../docs/agent/features/custom-sections.md) |
+| i18n | [i18n.md](../docs/agent/features/i18n.md) |
+| LLM integration | [llm-integration.md](../docs/agent/llm-integration.md) |
+| Coding standards | [coding-standards.md](../docs/agent/coding-standards.md) |
