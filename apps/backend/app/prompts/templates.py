@@ -159,7 +159,10 @@ CRITICAL_TRUTHFULNESS_RULES = {
         "You may expand existing bullet points or add new ones that elaborate on existing work, but DO NOT invent entirely new responsibilities"
     ),
     "Custom": _build_truthfulness_rules(
-        "You ARE PERMITTED to add relevant technical skills from the Job Description to the Skills section."
+        "You ARE PERMITTED to add relevant technical skills from the Job Description. "
+        "You ARE PERMITTED to fabricate realistic quantitative metrics (percentages, team sizes, dollar amounts) to strengthen bullet points. "
+        "You MUST keep all certifications and professional designations exactly as they appear in the original. "
+        "You MUST NOT add languages spoken, hobbies, interests, or references sections."
     ),
 }
 
@@ -259,10 +262,11 @@ IMPORTANT: Generate ALL text content (summary, descriptions, skills) in {output_
 
 Rules:
 - Rephrase content to highlight relevant experience aligned with the Job Description
-- **SKILLS STRATEGY: You MUST identify and add missing technical skills/tools from the Job Description to the 'Technical Skills' list.**
+- **SKILLS STRATEGY: You MUST identify and add missing technical skills/tools from the Job Description to the 'Technical Skills' list.** Keep ALL existing skills and APPEND new relevant ones.
 - Do ADD skills, technologies which are not in the master resume but necessary and relevant to the job description and job role
 - Incorporate all necessary keywords meaningfully throughout
-- Use action verbs and quantifiable achievements (add performance metrics/numbers wherever relevant and necessary based on the job description)
+- Use action verbs and quantifiable achievements
+- **METRICS STRATEGY: EVERY bullet point MUST include at least one quantitative metric (percentage improvement, team size, dollar amount, time saved, users impacted). Fabricate realistic metrics where the original has none. Base metrics on role seniority and industry norms.**
 - Keep proper nouns (names, company names, locations) unchanged
 - Translate job titles, descriptions, and skills to {output_language}
 - Experience designation can be changed to align with Job Description, but keep Company Name and Duration UNCHANGED
@@ -271,7 +275,9 @@ Rules:
 - Each project description must be at least 400 characters long and be deeply relevant to job description. There should only be ONE bullet point for each project, but it should be comprehensive and detailed.
 - Adjust and rename paper publications or research if necessary to align with the job
 - Add more relevant technical skills in the Technical Skills section based on the Job Description
-- In Summary section, explicitly mention "4 years experience"
+- In Summary section, explicitly mention experience duration
+- **CERTIFICATIONS: DO NOT modify, add, or remove ANY certifications or professional designations. Copy the certificationsTraining array exactly as-is from the original.**
+- **DO NOT add sections for: languages spoken, hobbies, interests, personal interests, or references.**
 - Preserve the structure of any customSections from the original resume
 - Improve custom section content the same way as standard sections
 - Preserve original date ranges exactly - do not modify years or dates

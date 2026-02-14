@@ -103,6 +103,12 @@ next-env.d.ts
 
 .idea/
 
+# Temporary development files
+tmp_*.json
+
 # Config file with API keys - NEVER COMMIT
 config.json
 **/config.json
+
+# Playwright MCP
+.playwright-mcp/

@@ -19,6 +19,8 @@ from app.prompts.refinement import (
     AI_PHRASE_BLACKLIST,
     AI_PHRASE_REPLACEMENTS,
     KEYWORD_INJECTION_PROMPT,
+    METRIC_VERIFICATION_PROMPT,
+    REDUNDANT_SECTION_BLACKLIST,
 )
 from app.schemas.refinement import (
     AlignmentReport,
@@ -48,6 +50,124 @@ def _keyword_in_text(keyword: str, text: str) -> bool:
     return bool(re.search(pattern, text.lower()))
 
 
+TARGET_MATCH_PERCENTAGE = 70.0
+MAX_MATCH_ITERATIONS = 3
+
+
+def strip_redundant_sections(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Remove blacklisted sections from resume data.
+
+    Strips sections like 'languages', 'hobbies', 'references' from
+    both additional and customSections.
+
+    Args:
+        data: Resume data dictionary
+
+    Returns:
+        Tuple of (cleaned data, list of removed section names)
+    """
+    cleaned = _deep_copy(data)
+    removed: list[str] = []
+
+    # Check additional sections
+    additional = cleaned.get("additional", {})
+    if isinstance(additional, dict):
+        keys_to_remove = []
+        for key in additional:
+            if key.lower().replace("_", " ") in REDUNDANT_SECTION_BLACKLIST:
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del additional[key]
+            removed.append(key)
+
+    # Check customSections
+    custom = cleaned.get("customSections", {})
+    if isinstance(custom, dict):
+        keys_to_remove = []
+        for key in custom:
+            normalized = key.lower().replace("_", " ")
+            if normalized in REDUNDANT_SECTION_BLACKLIST:
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del custom[key]
+            removed.append(key)
+
+    if removed:
+        logger.info("Stripped redundant sections: %s", removed)
+
+    return cleaned, removed
+
+
+async def verify_metrics(
+    resume: dict[str, Any],
+    job_description: str,
+    seniority_level: str,
+) -> dict[str, Any]:
+    """Use LLM to verify fabricated metrics are realistic.
+
+    Args:
+        resume: Resume data with potentially fabricated metrics
+        job_description: Job description for industry context
+        seniority_level: Seniority level (junior, mid, senior, lead)
+
+    Returns:
+        Resume data with verified/adjusted metrics
+    """
+    truncated_jd, _ = _prepare_job_description(job_description)
+
+    prompt = METRIC_VERIFICATION_PROMPT.format(
+        resume=json.dumps(resume, indent=2),
+        job_description=truncated_jd,
+        seniority_level=seniority_level or "mid-level",
+    )
+
+    try:
+        result = await complete_json(
+            prompt=prompt,
+            system_prompt=(
+                "You are a resume metrics auditor. Verify that all quantitative claims "
+                "are realistic for the role and industry. Adjust implausible numbers. "
+                "Return only valid JSON matching the input schema."
+            ),
+            max_tokens=8192,
+        )
+
+        if not isinstance(result, dict):
+            logger.warning("Metric verification returned non-dict: %s", type(result))
+            return resume
+
+        if not _validate_resume_structure(result):
+            logger.warning("Metric verification corrupted structure, using original")
+            return resume
+
+        return result
+
+    except Exception as e:
+        logger.warning("Metric verification failed: %s", e)
+        return resume
+
+
+def _enforce_certifications(
+    current: dict[str, Any],
+    master: dict[str, Any],
+) -> dict[str, Any]:
+    """Ensure certifications from master are preserved exactly.
+
+    Args:
+        current: Current resume being refined
+        master: Master resume (source of truth for certs)
+
+    Returns:
+        Resume with master certifications restored
+    """
+    master_certs = master.get("additional", {}).get("certificationsTraining", [])
+    if master_certs:
+        current.setdefault("additional", {})["certificationsTraining"] = list(
+            master_certs
+        )
+    return current
+
+
 async def refine_resume(
     initial_tailored: dict[str, Any],
     master_resume: dict[str, Any],
@@ -56,6 +176,14 @@ async def refine_resume(
     config: RefinementConfig | None = None,
 ) -> RefinementResult:
     """Multi-pass refinement of an initially tailored resume.
+
+    Pipeline:
+    1. Iterative keyword injection loop (up to MAX_MATCH_ITERATIONS until TARGET_MATCH_PERCENTAGE)
+    2. AI phrase removal (local)
+    3. Master alignment validation (relaxed: companies/dates/education only)
+    4. Metric verification (LLM)
+    5. Redundant section stripping (local)
+    6. Certification enforcement (local)
 
     Args:
         initial_tailored: Output from improve_resume() first pass
@@ -76,25 +204,56 @@ async def refine_resume(
     keyword_analysis: KeywordGapAnalysis | None = None
     alignment: AlignmentReport | None = None
 
-    # Pass 1: Keyword injection (if enabled)
+    # Pass 1: Iterative keyword injection loop
     if config.enable_keyword_injection:
-        keyword_analysis = analyze_keyword_gaps(job_keywords, current, master_resume)
-        if keyword_analysis.injectable_keywords:
-            logger.info(
-                "Injecting %d keywords: %s",
-                len(keyword_analysis.injectable_keywords),
-                keyword_analysis.injectable_keywords,
+        addressed_keywords: set[str] = set()
+
+        for iteration in range(MAX_MATCH_ITERATIONS):
+            keyword_analysis = analyze_keyword_gaps(
+                job_keywords, current, master_resume
             )
+            current_match = keyword_analysis.current_match_percentage
+
+            logger.info(
+                "Keyword match iteration %d: %.1f%% (target: %.1f%%)",
+                iteration + 1,
+                current_match,
+                TARGET_MATCH_PERCENTAGE,
+            )
+
+            if current_match >= TARGET_MATCH_PERCENTAGE:
+                logger.info("Target match percentage reached: %.1f%%", current_match)
+                break
+
+            # Get all missing keywords (both injectable and non-injectable since
+            # we now allow fabrication)
+            all_missing = keyword_analysis.missing_keywords
+            # Filter out already-addressed keywords to avoid infinite loops
+            new_missing = [kw for kw in all_missing if kw not in addressed_keywords]
+
+            if not new_missing:
+                logger.info("No new keywords to inject, stopping loop")
+                break
+
+            logger.info(
+                "Injecting %d keywords (iteration %d): %s",
+                len(new_missing),
+                iteration + 1,
+                new_missing,
+            )
+
             try:
                 current = await inject_keywords(
                     current,
-                    keyword_analysis.injectable_keywords,
+                    new_missing,
                     master_resume,
                     job_description,
                 )
+                addressed_keywords.update(new_missing)
                 passes += 1
             except Exception as e:
-                logger.warning("Keyword injection failed: %s", e)
+                logger.warning("Keyword injection failed (iteration %d): %s", iteration + 1, e)
+                break
 
     # Pass 2: AI phrase removal and polish (local, no LLM call)
     if config.enable_ai_phrase_removal:
@@ -104,34 +263,40 @@ async def refine_resume(
             logger.info("Removed %d AI phrases: %s", len(removed), removed)
             passes += 1
 
-    # Pass 3: Master alignment validation
-    # LLM-008: Alignment validation is MANDATORY - not optional fallback
+    # Pass 3: Master alignment validation (relaxed)
+    # Only check companies and education — skills fabrication is allowed
     if config.enable_master_alignment_check:
         alignment = validate_master_alignment(current, master_resume)
         if not alignment.is_aligned:
-            # Count critical violations
-            critical_violations = [
-                v for v in alignment.violations if v.severity == "critical"
+            # Only fix company and education violations, not skills
+            company_violations = [
+                v
+                for v in alignment.violations
+                if v.violation_type == "fabricated_company"
             ]
-            logger.warning(
-                "Alignment violations found: %d total, %d critical",
-                len(alignment.violations),
-                len(critical_violations),
-            )
-
-            if critical_violations:
-                # LLM-008: Block resume with fabricated content
-                logger.error(
-                    "Critical alignment violations detected - blocking resume: %s",
-                    [v.value for v in critical_violations],
+            if company_violations:
+                logger.warning(
+                    "Fixing %d company alignment violations",
+                    len(company_violations),
                 )
-                # Fix violations before returning
-                current = fix_alignment_violations(current, alignment.violations)
+                current = fix_alignment_violations(current, company_violations)
                 passes += 1
-            else:
-                # Non-critical violations - fix and continue
-                current = fix_alignment_violations(current, alignment.violations)
-                passes += 1
+
+    # Pass 4: Metric verification (LLM call)
+    seniority = job_keywords.get("seniority_level", "mid-level")
+    try:
+        current = await verify_metrics(current, job_description, seniority)
+        passes += 1
+    except Exception as e:
+        logger.warning("Metric verification pass failed: %s", e)
+
+    # Pass 5: Strip redundant sections (local)
+    current, stripped = strip_redundant_sections(current)
+    if stripped:
+        passes += 1
+
+    # Pass 6: Enforce certifications from master (local)
+    current = _enforce_certifications(current, master_resume)
 
     # Calculate final match percentage
     final_match = calculate_keyword_match(current, job_keywords)
@@ -412,8 +577,9 @@ async def inject_keywords(
         result = await complete_json(
             prompt=prompt,
             system_prompt=(
-                "You are a resume editor. Inject keywords naturally without adding "
-                "fabricated content. Return only valid JSON matching the input schema."
+                "You are a resume editor. Inject keywords naturally into the resume. "
+                "You may add new skills and fabricate realistic metrics. "
+                "Return only valid JSON matching the input schema."
             ),
             max_tokens=8192,
         )
