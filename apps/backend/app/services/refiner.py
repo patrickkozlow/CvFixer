@@ -255,8 +255,36 @@ def validate_master_alignment(
     """
     violations: list[AlignmentViolation] = []
 
-    # Note: technicalSkills are NOT checked - we intentionally allow adding
-    # JD-relevant skills that aren't in the master resume.
+    # technicalSkills are now checked — skills are frozen to master values.
+    # Violations are warning severity (Layer 2 in the router guarantees restoration).
+    tailored_skills = set(
+        s.lower()
+        for s in tailored.get("additional", {}).get("technicalSkills", [])
+        if isinstance(s, str)
+    )
+    master_skills = set(
+        s.lower()
+        for s in master.get("additional", {}).get("technicalSkills", [])
+        if isinstance(s, str)
+    )
+    for skill in tailored_skills - master_skills:
+        violations.append(
+            AlignmentViolation(
+                field_path="additional.technicalSkills",
+                violation_type="skill_not_in_master",
+                value=skill,
+                severity="warning",
+            )
+        )
+    for skill in master_skills - tailored_skills:
+        violations.append(
+            AlignmentViolation(
+                field_path="additional.technicalSkills",
+                violation_type="master_skill_missing",
+                value=skill,
+                severity="warning",
+            )
+        )
 
     # Check certifications
     tailored_certs = set(
@@ -344,6 +372,48 @@ def validate_master_alignment(
                     severity="critical",
                 )
             )
+
+    # Check education alignment (index-based comparison)
+    master_edu = master.get("education", [])
+    tailored_edu = tailored.get("education", [])
+    if len(master_edu) != len(tailored_edu):
+        violations.append(
+            AlignmentViolation(
+                field_path="education",
+                violation_type="education_entry_count_mismatch",
+                value=f"{len(master_edu)} -> {len(tailored_edu)}",
+                severity="warning",
+            )
+        )
+    else:
+        for i, (m_entry, t_entry) in enumerate(zip(master_edu, tailored_edu)):
+            if not isinstance(m_entry, dict) or not isinstance(t_entry, dict):
+                continue
+            for field in ("institution", "degree", "years"):
+                m_val = m_entry.get(field, "").lower().strip()
+                t_val = t_entry.get(field, "").lower().strip()
+                if m_val and t_val and m_val != t_val:
+                    violations.append(
+                        AlignmentViolation(
+                            field_path=f"education[{i}].{field}",
+                            violation_type="education_field_modified",
+                            value=f"{m_val} -> {t_val}",
+                            severity="warning",
+                        )
+                    )
+
+    # Check personalProjects alignment (count only)
+    master_proj = master.get("personalProjects", [])
+    tailored_proj = tailored.get("personalProjects", [])
+    if len(master_proj) != len(tailored_proj):
+        violations.append(
+            AlignmentViolation(
+                field_path="personalProjects",
+                violation_type="project_entry_count_mismatch",
+                value=f"{len(master_proj)} -> {len(tailored_proj)}",
+                severity="warning",
+            )
+        )
 
     is_aligned = len([v for v in violations if v.severity == "critical"]) == 0
     confidence = 1.0 - (len(violations) * 0.1)  # Decrease confidence per violation
@@ -488,49 +558,77 @@ def fix_alignment_violations(
                 if company_key:
                     master_by_company[company_key] = exp
 
+    # Track which warning restorations have been applied (restore once per pass)
+    _skills_restored = False
+    _education_restored = False
+    _projects_restored = False
+
     for violation in violations:
-        if violation.severity != "critical":
-            continue
-
-        if violation.violation_type == "fabricated_cert":
-            certs = fixed.get("additional", {}).get("certificationsTraining", [])
-            fixed.setdefault("additional", {})["certificationsTraining"] = [
-                c for c in certs if c.lower() != violation.value.lower()
-            ]
-
-        elif violation.violation_type == "fabricated_company":
-            # SVC-002: Remove the fabricated work experience entry
-            logger.error("Critical: Fabricated company detected: %s", violation.value)
-            if "workExperience" in fixed:
-                fixed["workExperience"] = [
-                    exp
-                    for exp in fixed["workExperience"]
-                    if exp.get("company", "").lower() != violation.value.lower()
+        if violation.severity == "critical":
+            if violation.violation_type == "fabricated_cert":
+                certs = fixed.get("additional", {}).get("certificationsTraining", [])
+                fixed.setdefault("additional", {})["certificationsTraining"] = [
+                    c for c in certs if c.lower() != violation.value.lower()
                 ]
-                logger.info(
-                    "Removed fabricated company '%s' from resume",
-                    violation.value,
-                )
 
-        elif violation.violation_type == "modified_title":
-            # Restore original title from master
-            company_key = violation.field_path.split("[")[1].split("]")[0]
-            master_exp = master_by_company.get(company_key)
-            if master_exp:
-                for exp in fixed.get("workExperience", []):
-                    if exp.get("company", "").lower() == company_key:
-                        exp["title"] = master_exp.get("title", exp.get("title", ""))
-                        logger.info("Restored title for '%s'", company_key)
+            elif violation.violation_type == "fabricated_company":
+                # SVC-002: Remove the fabricated work experience entry
+                logger.error("Critical: Fabricated company detected: %s", violation.value)
+                if "workExperience" in fixed:
+                    fixed["workExperience"] = [
+                        exp
+                        for exp in fixed["workExperience"]
+                        if exp.get("company", "").lower() != violation.value.lower()
+                    ]
+                    logger.info(
+                        "Removed fabricated company '%s' from resume",
+                        violation.value,
+                    )
 
-        elif violation.violation_type == "modified_dates":
-            # Restore original dates from master
-            company_key = violation.field_path.split("[")[1].split("]")[0]
-            master_exp = master_by_company.get(company_key)
-            if master_exp:
-                for exp in fixed.get("workExperience", []):
-                    if exp.get("company", "").lower() == company_key:
-                        exp["years"] = master_exp.get("years", exp.get("years", ""))
-                        logger.info("Restored dates for '%s'", company_key)
+            elif violation.violation_type == "modified_title":
+                # Restore original title from master
+                company_key = violation.field_path.split("[")[1].split("]")[0]
+                master_exp = master_by_company.get(company_key)
+                if master_exp:
+                    for exp in fixed.get("workExperience", []):
+                        if exp.get("company", "").lower() == company_key:
+                            exp["title"] = master_exp.get("title", exp.get("title", ""))
+                            logger.info("Restored title for '%s'", company_key)
+
+            elif violation.violation_type == "modified_dates":
+                # Restore original dates from master
+                company_key = violation.field_path.split("[")[1].split("]")[0]
+                master_exp = master_by_company.get(company_key)
+                if master_exp:
+                    for exp in fixed.get("workExperience", []):
+                        if exp.get("company", "").lower() == company_key:
+                            exp["years"] = master_exp.get("years", exp.get("years", ""))
+                            logger.info("Restored dates for '%s'", company_key)
+
+        elif violation.severity == "warning":
+            if violation.violation_type in ("skill_not_in_master", "master_skill_missing"):
+                if not _skills_restored and master:
+                    master_skills = master.get("additional", {}).get("technicalSkills")
+                    if master_skills is not None:
+                        fixed.setdefault("additional", {})["technicalSkills"] = copy.deepcopy(master_skills)
+                        logger.info("Restored technicalSkills from master after warning violation")
+                        _skills_restored = True
+
+            elif violation.violation_type in ("education_entry_count_mismatch", "education_field_modified"):
+                if not _education_restored and master:
+                    master_edu = master.get("education")
+                    if master_edu is not None:
+                        fixed["education"] = copy.deepcopy(master_edu)
+                        logger.info("Restored education from master after warning violation")
+                        _education_restored = True
+
+            elif violation.violation_type == "project_entry_count_mismatch":
+                if not _projects_restored and master:
+                    master_proj = master.get("personalProjects")
+                    if master_proj is not None:
+                        fixed["personalProjects"] = copy.deepcopy(master_proj)
+                        logger.info("Restored personalProjects from master after warning violation")
+                        _projects_restored = True
 
     return fixed
 
