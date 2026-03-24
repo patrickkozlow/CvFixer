@@ -158,12 +158,10 @@ CRITICAL_TRUTHFULNESS_RULES = {
     "full": _build_truthfulness_rules(
         "You MUST completely rewrite bullet points to directly address the job description's responsibilities and required skills. "
         "Treat bullet point content as a BLANK CANVAS - the ONLY things you must preserve are company names, job titles, and dates. "
-        "ADD ALL relevant skills and tools from the job description to the technicalSkills section, even if not in the original resume. "
         "INVENT realistic metrics (percentages, team sizes, dollar amounts) for most bullets - keep them plausible for the role seniority. "
         "You MAY add or remove bullet points as needed to maximize alignment with the JD."
     ),
     "boost": _build_truthfulness_rules(
-        "You MAY freely add relevant skills and tools from the job description to the skills section. "
         "You MAY invent realistic metrics (percentages, team sizes, dollar amounts) to strengthen bullet points. "
         "You MAY expand, add, or rephrase bullet points to incorporate more JD keywords. "
         "Prioritize maximizing keyword match over conservative editing."
@@ -187,6 +185,11 @@ Rules:
 - Preserve original date ranges exactly - do not modify years
 - If the resume is non-technical, do NOT add technical jargon
 - Do NOT use em dash ("—") anywhere in the writing/output, even if it exists, remove it
+
+FROZEN FIELDS (copy these EXACTLY from the original resume — do NOT modify):
+- technicalSkills: copy as-is, do not add or remove any skills
+- education: copy all entries as-is, do not change any field
+- personalProjects: copy all entries as-is, do not change any field
 
 Job Description:
 {job_description}
@@ -215,6 +218,11 @@ Rules:
 - Preserve original date ranges exactly - do not modify years
 - If resume is non-technical, keep language non-technical while still aligning keywords
 - Do NOT use em dash ("—") anywhere in the writing/output, even if it exists, remove it
+
+FROZEN FIELDS (copy these EXACTLY from the original resume — do NOT modify):
+- technicalSkills: copy as-is, do not add or remove any skills
+- education: copy all entries as-is, do not change any field
+- personalProjects: copy all entries as-is, do not change any field
 
 Job Description:
 {job_description}
@@ -259,10 +267,10 @@ SUMMARY STRATEGY:
 - Mention total years of relevant experience if it matches JD requirements
 - Do NOT write a generic career overview - make it a compelling pitch for THIS job
 
-SKILLS STRATEGY:
-- ADD ALL relevant skills and tools from the job description to technicalSkills, even if not in the original resume
-- Include required_skills first, then preferred_skills, then other JD keywords
-- ALWAYS include a comprehensive technicalSkills section aligned with the JD
+FROZEN FIELDS (copy these EXACTLY from the original resume — do NOT modify):
+- technicalSkills: copy as-is, do not add or remove any skills
+- education: copy all entries as-is, do not change any field
+- personalProjects: copy all entries as-is, do not change any field
 
 HARD CONSTRAINTS (DO NOT VIOLATE):
 - Keep company names, locations, and employment dates EXACTLY as provided
@@ -301,8 +309,6 @@ ENGINEERING RIGOR RULES:
 
 Rules:
 - Weave MORE keywords from the job description into bullet points naturally
-- ADD any missing JD skills and tools to the technicalSkills list
-- ALWAYS include a technicalSkills section with relevant skills from the job description
 - Strengthen action verbs to match the language used in the job description
 - Mirror the JD's phrasing where it fits the candidate's real experience
 - You MAY invent realistic metrics (percentages, team sizes, dollar amounts) where they strengthen a bullet point, but keep them plausible
@@ -314,6 +320,11 @@ Rules:
 - Preserve the structure of any customSections from the original resume
 - Preserve original date ranges exactly - do not modify years
 - Do NOT use em dash ("-") anywhere in the writing/output, even if it exists, remove it
+
+FROZEN FIELDS (copy these EXACTLY from the original resume — do NOT modify):
+- technicalSkills: copy as-is, do not add or remove any skills
+- education: copy all entries as-is, do not change any field
+- personalProjects: copy all entries as-is, do not change any field
 
 Job Description:
 {job_description}

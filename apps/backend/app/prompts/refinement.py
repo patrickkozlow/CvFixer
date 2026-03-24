@@ -136,18 +136,20 @@ AI_PHRASE_REPLACEMENTS: dict[str, str] = {
 KEYWORD_INJECTION_PROMPT = """Inject ALL of the following keywords into this resume. Be aggressive - every keyword should appear somewhere.
 
 STRATEGY:
-1. ADD ALL skills and tools from the keywords list to the technicalSkills section
-2. Rewrite bullet points to incorporate keywords, mirroring JD phrasing where possible
-3. You MAY add new bullet points if needed to incorporate remaining keywords
-4. You MAY add keywords that are NOT in the master resume - the JD is the source of truth for what skills to include
-5. Invent realistic metrics and details to support keyword integration
+1. Rewrite bullet points to incorporate keywords, mirroring JD phrasing where possible
+2. You MAY add new bullet points if needed to incorporate remaining keywords
+3. Invent realistic metrics and details to support keyword integration
 
 CONSTRAINTS:
-1. Do NOT modify certifications - copy certificationsTraining exactly as-is from the master resume
-2. Do NOT include spoken languages - set languages to an empty array []
-3. Keep company names, job titles, and dates unchanged from the current tailored resume
-4. Maintain the exact same JSON structure
-5. Do not use em-dashes (\u2014) or their variants (---, --)
+1. FROZEN FIELDS (copy these EXACTLY from the original resume — do NOT modify):
+   - technicalSkills: copy as-is, do not add or remove any skills
+   - education: copy all entries as-is, do not change any field
+   - personalProjects: copy all entries as-is, do not change any field
+2. Do NOT modify certifications - copy certificationsTraining exactly as-is from the master resume
+3. Do NOT include spoken languages - set languages to an empty array []
+4. Keep company names, job titles, and dates unchanged from the current tailored resume
+5. Maintain the exact same JSON structure
+6. Do not use em-dashes (\u2014) or their variants (---, --)
 
 Keywords to inject (use ALL of these):
 {keywords_to_inject}

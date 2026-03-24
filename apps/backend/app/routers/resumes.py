@@ -190,20 +190,31 @@ def _preserve_personal_info(
         if original_certs is not None:
             result_additional["certificationsTraining"] = copy.deepcopy(original_certs)
 
-        # Populate technicalSkills from master if LLM returned empty
-        improved_skills = result_additional.get("technicalSkills", [])
-        if not improved_skills:
-            original_skills = original_additional.get("technicalSkills", [])
-            if original_skills:
-                result_additional["technicalSkills"] = copy.deepcopy(original_skills)
-                logger.info(
-                    "technicalSkills empty in LLM output; populated %d from master",
-                    len(original_skills),
-                )
+        # Freeze technicalSkills unconditionally from master
+        original_skills = original_additional.get("technicalSkills")
+        if original_skills is not None:
+            result_additional["technicalSkills"] = copy.deepcopy(original_skills)
+            logger.info(
+                "Froze technicalSkills from master (%d skills)", len(original_skills)
+            )
 
     # Strip spoken languages from output (not relevant to resume tailoring)
     if isinstance(result.get("additional"), dict):
         result["additional"]["languages"] = []
+
+    # Freeze education from master
+    original_education = original_data.get("education")
+    if original_education is not None:
+        result["education"] = copy.deepcopy(original_education)
+        logger.info("Froze education from master (%d entries)", len(original_education))
+
+    # Freeze personalProjects from master
+    original_projects = original_data.get("personalProjects")
+    if original_projects is not None:
+        result["personalProjects"] = copy.deepcopy(original_projects)
+        logger.info(
+            "Froze personalProjects from master (%d entries)", len(original_projects)
+        )
 
     return result, warnings
 
